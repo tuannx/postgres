@@ -1,0 +1,47 @@
+{
+  "project": "tuannx/postgres",
+  "language": "C",
+  "framework": "pgbench (src/bin/pgbench, built-in TPC-B-like script)",
+  "date": "2026-11-21",
+  "fork_commit": "59d1adad1e4e2ca1944c8011fb067f9bed2e2d0b",
+  "postgres_version": "20devel",
+  "build": {
+    "configure": "--without-icu --without-zstd --without-lz4 --without-openssl --without-libxml --without-libxslt --without-perl --without-python --without-tcl --disable-cassert --disable-debug CFLAGS=-O2",
+    "make": "make -j2 (full build, ~585s on this VM) + make install",
+    "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "build_tools_added": "bison 3.8.2, flex 2.6.4, libreadline-dev (apt)"
+  },
+  "environment": {
+    "os": "Linux htch-runtime 7.0.0-44-generic x86_64",
+    "cpu": "AMD EPYC 9D25 126-Core Processor, 4 vCPU visible, ~1.5 effective CPU (shared VM)",
+    "ram": "~7.7 GB shared",
+    "caveat": "Shared VM (~1.5 effective CPU, ~7.7GB RAM shared, parallel processes) - numbers are noisy; run1 vs run2 differed by ~23% TPS with identical config. Treat baseline as order-of-magnitude regression detector, not absolute performance claim."
+  },
+  "server_config": {
+    "listen_addresses": "",
+    "socket_only": true,
+    "port": 55433,
+    "fsync": "off",
+    "synchronous_commit": "off",
+    "shared_buffers": "128MB",
+    "max_connections": 20,
+    "note": "fsync/synchronous_commit off is a documented bench-only setting to measure CPU/query path, not durability; do not use in production."
+  },
+  "pgbench_config": {
+    "init": "pgbench -i -s 1 (scale factor 1, 100000 accounts)",
+    "command": "pgbench -c 1 -j 1 -t 1000 (builtin TPC-B, simple query mode)",
+    "clients": 1,
+    "threads": 1,
+    "transactions_per_client": 1000,
+    "determinism": "fixed scale=1, fixed -t 1000, single client/thread; pgbench data generation is deterministic in row count, transaction mix is the builtin script"
+  },
+  "results": {
+    "run1": { "tps_without_initial_connection": 2091.341428, "latency_avg_ms": 0.478, "transactions_processed": "1000/1000", "failed_transactions": 0, "initial_connection_ms": 3.769 },
+    "run2_repeat_same_config": { "tps_without_initial_connection": 1612.143958, "latency_avg_ms": 0.620, "transactions_processed": "1000/1000", "failed_transactions": 0, "initial_connection_ms": 2.704 },
+    "baseline_tps": 2091.341428,
+    "baseline_latency_avg_ms": 0.478,
+    "baseline_source": "run1 (canonical, the config perf/run-perf.sh reproduces)"
+  },
+  "hot_path": "pgbench builtin TPC-B transaction: UPDATE pgbench_accounts / pgbench_tellers / pgbench_branches + SELECT abalance + INSERT pgbench_history, executed via postgres backend (parser/executor/storage) over Unix socket",
+  "verdict_thresholds": { "regression_warn_pct": 10, "regression_block_pct": 25 }
+}
